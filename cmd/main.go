@@ -1,8 +1,8 @@
 package main
 
 import (
-	"calc_parallel/internal/orchestrator"
-	"calc_parallel/pkg/agent"
+	"calc_parallel/internal/application"
+	"log"
 	"os"
 )
 
@@ -11,8 +11,9 @@ func main() {
 	os.Setenv("TIME_SUBTRACTION_MS", "200")
 	os.Setenv("TIME_MULTIPLICATIONS_MS", "200")
 	os.Setenv("TIME_DIVISIONS_MS", "200")
-	os.Setenv("COMPUTING_POWER", "10")
-	orc := orchestrator.NewOrchestrator()
-	orc.Run_Orchestrator()
-	agent.Start()
+	orc := application.NewOrchestrator()
+	err := orc.Run_Orchestrator()
+	if err != nil {
+		log.Printf("err whith server, %v", err)
+	}
 }

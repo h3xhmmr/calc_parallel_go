@@ -1,4 +1,4 @@
-package orchestrator
+package application
 
 import (
 	"encoding/json"
@@ -7,53 +7,37 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
 
-type Config struct {
-	Addr                string
+type Time_env struct {
 	TimeAddition        int
 	TimeSubtraction     int
 	TimeMultiplications int
 	TimeDivisions       int
 }
 
-func ConfigFromEnv() *Config {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-	ta, _ := strconv.Atoi(os.Getenv("TIME_ADDITION_MS"))
-	if ta == 0 {
-		ta = 100
-	}
-	ts, _ := strconv.Atoi(os.Getenv("TIME_SUBTRACTION_MS"))
-	if ts == 0 {
-		ts = 100
-	}
-	tm, _ := strconv.Atoi(os.Getenv("TIME_MULTIPLICATIONS_MS"))
-	if tm == 0 {
-		tm = 100
-	}
-	td, _ := strconv.Atoi(os.Getenv("TIME_DIVISIONS_MS"))
-	if td == 0 {
-		td = 100
-	}
-	return &Config{
-		Addr:                port,
-		TimeAddition:        ta,
-		TimeSubtraction:     ts,
-		TimeMultiplications: tm,
-		TimeDivisions:       td,
+func Time() *Time_env {
+	t_add, _ := strconv.Atoi(os.Getenv("TIME_ADDITION_MS"))
+	t_sub, _ := strconv.Atoi(os.Getenv("TIME_SUBTRACTION_MS"))
+	t_mul, _ := strconv.Atoi(os.Getenv("TIME_MULTIPLICATIONS_MS"))
+	t_div, _ := strconv.Atoi(os.Getenv("TIME_DIVISIONS_MS"))
+
+	return &Time_env{
+		TimeAddition:        t_add,
+		TimeSubtraction:     t_sub,
+		TimeMultiplications: t_mul,
+		TimeDivisions:       t_div,
 	}
 }
 
 type Orchestrator struct {
-	Config      *Config
+	op_time     *Time_env
 	exprStore   map[string]*Expression
-	taskStore   map[string]*Task
-	taskQueue   []*Task
+	taskStore   map[string]Task
+	taskQueue   []Task
 	mu          sync.Mutex
 	exprCounter int64
 	taskCounter int64
@@ -61,10 +45,10 @@ type Orchestrator struct {
 
 func NewOrchestrator() *Orchestrator {
 	return &Orchestrator{
-		Config:    ConfigFromEnv(),
+		op_time:   Time(),
 		exprStore: make(map[string]*Expression),
-		taskStore: make(map[string]*Task),
-		taskQueue: make([]*Task, 0),
+		taskStore: make(map[string]Task),
+		taskQueue: make([]Task, 0),
 	}
 }
 
@@ -74,16 +58,6 @@ type Expression struct {
 	Status string   `json:"status"`
 	Result *float64 `json:"result,omitempty"`
 	AST    *ASTNode `json:"-"`
-}
-
-type Task struct {
-	ID            string   `json:"id"`
-	ExprID        string   `json:"-"`
-	Arg1          float64  `json:"arg1"`
-	Arg2          float64  `json:"arg2"`
-	Operation     string   `json:"operation"`
-	OperationTime int      `json:"operation_time"`
-	Node          *ASTNode `json:"-"`
 }
 
 func (o *Orchestrator) CalculateHandler(w http.ResponseWriter, r *http.Request) {
@@ -110,7 +84,7 @@ func (o *Orchestrator) CalculateHandler(w http.ResponseWriter, r *http.Request) 
 	expr := &Expression{
 		ID:     exprID,
 		Expr:   req.Expression,
-		Status: "pending",
+		Status: "in process",
 		AST:    ast,
 	}
 	o.exprStore[exprID] = expr
@@ -122,7 +96,7 @@ func (o *Orchestrator) CalculateHandler(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(map[string]string{"id": exprID})
 }
 
-func (o *Orchestrator) expressionsHandler(w http.ResponseWriter, r *http.Request) {
+func (o *Orchestrator) Handler_expressions(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, `{"error":"Wrong Method"}`, http.StatusMethodNotAllowed)
 		return
@@ -141,12 +115,12 @@ func (o *Orchestrator) expressionsHandler(w http.ResponseWriter, r *http.Request
 	json.NewEncoder(w).Encode(map[string]interface{}{"expressions": exprs})
 }
 
-func (o *Orchestrator) expressionByIDHandler(w http.ResponseWriter, r *http.Request) {
+func (o *Orchestrator) Handler_Id(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, `{"error":"Wrong Method"}`, http.StatusMethodNotAllowed)
 		return
 	}
-	id := r.URL.Path[len("/api/v1/expressions/"):]
+	id := strings.TrimPrefix(r.URL.Path, "/api/v1/expressions/")
 	o.mu.Lock()
 	expr, ok := o.exprStore[id]
 	o.mu.Unlock()
@@ -162,7 +136,7 @@ func (o *Orchestrator) expressionByIDHandler(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(map[string]interface{}{"expression": expr})
 }
 
-func (o *Orchestrator) getTaskHandler(w http.ResponseWriter, r *http.Request) {
+func (o *Orchestrator) Handler_Get(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, `{"error":"Wrong Method"}`, http.StatusMethodNotAllowed)
 		return
@@ -178,11 +152,15 @@ func (o *Orchestrator) getTaskHandler(w http.ResponseWriter, r *http.Request) {
 	if expr, exists := o.exprStore[task.ExprID]; exists {
 		expr.Status = "in_progress"
 	}
+	var Task_req struct {
+		Task Task `json:"task"`
+	}
+	Task_req.Task = task
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"task": task})
+	json.NewEncoder(w).Encode(Task_req)
 }
 
-func (o *Orchestrator) postTaskHandler(w http.ResponseWriter, r *http.Request) {
+func (o *Orchestrator) Handler_post(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, `{"error":"Wrong Method"}`, http.StatusMethodNotAllowed)
 		return
@@ -233,24 +211,22 @@ func (o *Orchestrator) scheduleTasks(expr *Expression) {
 				var opTime int
 				switch node.Operator {
 				case "+":
-					opTime = o.Config.TimeAddition
+					opTime = o.op_time.TimeAddition
 				case "-":
-					opTime = o.Config.TimeSubtraction
+					opTime = o.op_time.TimeSubtraction
 				case "*":
-					opTime = o.Config.TimeMultiplications
+					opTime = o.op_time.TimeMultiplications
 				case "/":
-					opTime = o.Config.TimeDivisions
-				default:
-					opTime = 100
+					opTime = o.op_time.TimeDivisions
 				}
-				task := &Task{
-					ID:            taskID,
-					ExprID:        expr.ID,
-					Arg1:          node.Left.Value,
-					Arg2:          node.Right.Value,
-					Operation:     node.Operator,
-					OperationTime: opTime,
-					Node:          node,
+				task := Task{
+					Id:             taskID,
+					ExprID:         expr.ID,
+					Arg1:           node.Left.Value,
+					Arg2:           node.Right.Value,
+					Operation:      node.Operator,
+					Operation_time: opTime,
+					Node:           node,
 				}
 				node.TaskScheduled = true
 				o.taskStore[taskID] = task
@@ -264,13 +240,13 @@ func (o *Orchestrator) scheduleTasks(expr *Expression) {
 func (o *Orchestrator) Run_Orchestrator() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/calculate", o.CalculateHandler)
-	mux.HandleFunc("/api/v1/expressions", o.expressionsHandler)
-	mux.HandleFunc("/api/v1/expressions/", o.expressionByIDHandler)
+	mux.HandleFunc("/api/v1/expressions", o.Handler_expressions)
+	mux.HandleFunc("/api/v1/expressions/", o.Handler_Id)
 	mux.HandleFunc("/internal/task", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
-			o.getTaskHandler(w, r)
+			o.Handler_Get(w, r)
 		} else if r.Method == http.MethodPost {
-			o.postTaskHandler(w, r)
+			o.Handler_post(w, r)
 		} else {
 			http.Error(w, `{"error":"Wrong Method"}`, http.StatusMethodNotAllowed)
 		}
@@ -280,13 +256,13 @@ func (o *Orchestrator) Run_Orchestrator() error {
 	})
 	go func() {
 		for {
-			time.Sleep(2 * time.Second)
+			time.Sleep(8 * time.Second)
 			o.mu.Lock()
 			if len(o.taskQueue) > 0 {
-				log.Printf("Pending tasks in queue: %d", len(o.taskQueue))
+				log.Printf("tasks in queue: %d", len(o.taskQueue))
 			}
 			o.mu.Unlock()
 		}
 	}()
-	return http.ListenAndServe(":"+o.Config.Addr, mux)
+	return http.ListenAndServe(":8080", mux)
 }
