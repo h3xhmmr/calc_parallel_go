@@ -54,6 +54,7 @@ func Worker(id int) {
 		err = json.NewDecoder(resp.Body).Decode(&taskresp)
 		resp.Body.Close()
 		if err != nil {
+			log.Printf("worker %d: error with task: %v", id, err)
 			time.Sleep(1 * time.Second)
 			continue
 		}
