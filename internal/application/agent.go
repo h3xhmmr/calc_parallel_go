@@ -24,6 +24,7 @@ type Task struct {
 type Task_resp struct {
 	Id     string `json:"id"`
 	Result string `json:"result"`
+	E      error  `json:"error"`
 }
 
 func Agent_start() {
@@ -70,15 +71,21 @@ func Worker(id int) {
 		log.Printf("Worker %d: received task %s: %f %s %f, time %d ms", id, task.Id, task.Arg1, task.Operation, task.Arg2, task.Operation_time)
 		time.Sleep(time.Duration(task.Operation_time) * time.Millisecond)
 		result, err := Calc(task.Arg1, task.Operation, task.Arg2)
-		if err != nil {
-			log.Printf("Worker %d: error %s: %v", id, task.Id, err)
-			continue
-		}
 
 		var res struct {
 			ID     string  `json:"id"`
 			Result float64 `json:"result"`
+			E      error   `json:"error"`
 		}
+
+		if err != nil {
+			res.E = err
+			resp, _ := json.Marshal(res)
+			http.Post("http://localhost:8080/internal/task", "application/json", bytes.NewReader(resp))
+			log.Printf("Worker %d: error %s: %v", id, task.Id, err)
+			continue
+		}
+
 		res.ID = task.Id
 		res.Result = result
 
