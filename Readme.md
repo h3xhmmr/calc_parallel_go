@@ -44,7 +44,7 @@
 
 Для начала установите Go на свой компьютер [тык](https://go.dev/doc/install), VisualStudio [тык](https://code.visualstudio.com/) и Git [тык](https://git-scm.com/downloads)
 
-Далее, зайдя в VStudio необходимо клонировать репозиторий `git clone https://github.com/h3xhmmr/calc_go`, а затем запустить сервер (по умолчанию работает на порте :8080)
+Далее, зайдя в VStudio необходимо клонировать репозиторий `git clone https://github.com/h3xhmmr/calc_parallel_go.git`, а затем запустить сервер (по умолчанию работает на порте :8080)
 Запуск сервера:
 * Сначала запускаем оркестратор `go run cmd/orch/main.go`
 * Затем запускаем агента в новом терминале `go run cmd/agent/main.go`
@@ -56,32 +56,32 @@
 Запрос:
 
 
-curl --location 'localhost/api/v1/calculate' \
+`curl --location 'localhost/api/v1/calculate' \
 --header 'Content-Type: application/json' \
 --data '{
   "expression": "2+2"
-}'
+}'`
 
 
 Ответ:
 
 
-{
+`{
     "id": "1"
-}
+}`
 
 
 ### Получение списка выражений 
 Запрос:
 
 
-curl --location 'localhost/api/v1/expressions'
+`curl --location 'localhost/api/v1/expressions'`
 
 
 Ответ:
 
 
-{
+`{
     "expressions": [
         {
             "id": "1",
@@ -94,27 +94,27 @@ curl --location 'localhost/api/v1/expressions'
             "result": "5.0"
         }
     ]
-}
+}`
 
 
 ### Получение выражения по id 
 Запрос:
 
 
-curl --location 'localhost/api/v1/expressions/1'
+`curl --location 'localhost/api/v1/expressions/1'`
 
 
 Ответ:
 
 
-{
+`{
     "expression":
         {
             "id": "1",
             "status": "in process",
             "result": "2-7"
         }
-}
+}`
 
 
 Для удобства проверки советую использовать Postman [тык](https://www.postman.com/downloads/)
