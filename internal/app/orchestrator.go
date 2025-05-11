@@ -1,8 +1,6 @@
 package application
 
 import (
-	p "calc_parallel/pkg"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -13,17 +11,14 @@ import (
 	"sync"
 	"time"
 
+	d "github.com/h3xhmmr/calc_parallel_go/internal/db"
+	p "github.com/h3xhmmr/calc_parallel_go/pkg"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 type Expression_ID struct {
-	ID int `json:"id"`
+	ID uint32 `json:"id"`
 	Expression
-}
-
-type DB struct {
-	db *sql.DB
-	mx *sync.Mutex
 }
 
 type Time_env struct {
@@ -48,7 +43,7 @@ func Time() *Time_env {
 }
 
 type Orchestrator struct {
-	db          *DB
+	db          *d.DB
 	op_time     *Time_env
 	exprStore   map[string]*Expression
 	taskStore   map[string]Task
@@ -255,17 +250,17 @@ func (o *Orchestrator) scheduleTasks(expr *Expression) {
 }
 
 func (o *Orchestrator) LoadData() error {
-	usersList, err := o.db.SelectAllUsers()
+	usersList, err := o.db.SelectUsers()
 	if err != nil {
 		return err
 	}
 	o.Users = usersList
 	for _, u := range usersList {
-		expressionsList, err := o.db.SelectExpressionsForUser(u)
+		expressionsList, err := o.db.SelectUser_Exp(u)
 		if err != nil {
 			return err
 		}
-		u.Expressions = make(map[int]*Expression)
+		u.Expressions = make(map[uint32]*Expression)
 		for _, v := range expressionsList {
 			u.Expressions[v.ID] = &v.Expression
 		}
