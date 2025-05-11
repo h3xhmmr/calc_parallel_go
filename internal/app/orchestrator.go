@@ -2,6 +2,7 @@ package application
 
 import (
 	p "calc_parallel/pkg"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -11,7 +12,19 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	_ "github.com/mattn/go-sqlite3"
 )
+
+type Expression_ID struct {
+	ID int `json:"id"`
+	Expression
+}
+
+type DB struct {
+	db *sql.DB
+	mx *sync.Mutex
+}
 
 type Time_env struct {
 	TimeAddition        int
@@ -35,6 +48,7 @@ func Time() *Time_env {
 }
 
 type Orchestrator struct {
+	db          *DB
 	op_time     *Time_env
 	exprStore   map[string]*Expression
 	taskStore   map[string]Task
@@ -238,6 +252,45 @@ func (o *Orchestrator) scheduleTasks(expr *Expression) {
 		}
 	}
 	traverse(expr.AST)
+}
+
+func (o *Orchestrator) LoadData() error {
+	usersList, err := o.db.SelectAllUsers()
+	if err != nil {
+		return err
+	}
+	o.Users = usersList
+	for _, u := range usersList {
+		expressionsList, err := o.db.SelectExpressionsForUser(u)
+		if err != nil {
+			return err
+		}
+		u.Expressions = make(map[int]*Expression)
+		for _, v := range expressionsList {
+			u.Expressions[v.ID] = &v.Expression
+		}
+	}
+	return nil
+}
+
+func (o *Orchestrator) SaveData() error {
+	err := o.db.Clear()
+	if err != nil {
+		return err
+	}
+	for _, u := range o.Users {
+		err = o.db.InsertUser(u)
+		if err != nil {
+			return err
+		}
+		for id, expr := range u.Expressions {
+			err = o.db.InsertExpression(&Expression_ID{Expression: *expr, ID: id}, u)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (o *Orchestrator) Run_Orchestrator() error {
