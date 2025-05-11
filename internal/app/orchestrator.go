@@ -1,6 +1,7 @@
 package application
 
 import (
+	p "calc_parallel/pkg"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -55,11 +56,11 @@ func NewOrchestrator() *Orchestrator {
 }
 
 type Expression struct {
-	ID     string   `json:"id"`
-	Expr   string   `json:"expression"`
-	Status string   `json:"status"`
-	Result *float64 `json:"result,omitempty"`
-	AST    *ASTNode `json:"-"`
+	ID     string     `json:"id"`
+	Expr   string     `json:"expression"`
+	Status string     `json:"status"`
+	Result *float64   `json:"result,omitempty"`
+	AST    *p.ASTNode `json:"-"`
 }
 
 func (o *Orchestrator) Handler_Calc(w http.ResponseWriter, r *http.Request) {
@@ -75,7 +76,7 @@ func (o *Orchestrator) Handler_Calc(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"Invalid Body"}`, http.StatusUnprocessableEntity)
 		return
 	}
-	ast, err := ParseAST(req.Expression)
+	ast, err := p.ParseAST(req.Expression)
 	if err != nil {
 		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusUnprocessableEntity)
 		return
@@ -199,8 +200,8 @@ func (o *Orchestrator) Handler_post(w http.ResponseWriter, r *http.Request) {
 }
 
 func (o *Orchestrator) scheduleTasks(expr *Expression) {
-	var traverse func(node *ASTNode)
-	traverse = func(node *ASTNode) {
+	var traverse func(node *p.ASTNode)
+	traverse = func(node *p.ASTNode) {
 		if node == nil || node.IsLeaf {
 			return
 		}
