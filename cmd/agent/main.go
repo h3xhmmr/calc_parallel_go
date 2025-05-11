@@ -1,7 +1,7 @@
 package main
 
 import (
-	"calc_parallel/internal/application"
+	application "calc_parallel/internal/application/app"
 	"os"
 )
 
