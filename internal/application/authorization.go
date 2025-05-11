@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 type AuthRequest struct {
@@ -28,6 +29,13 @@ const (
 	internalServerError = "error: internal server error"
 )
 
+type User struct {
+	ID          string
+	Login       string
+	Password    string
+	Expressions map[int]*Expression
+}
+
 func (o *Orchestrator) MakeToken(id string) string {
 	now := time.Now()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -36,7 +44,7 @@ func (o *Orchestrator) MakeToken(id string) string {
 		"exp": now.Add(time.Hour * 24).Unix(),
 		"iat": now.Unix(),
 	})
-	tokenString, err := token.SignedString([]byte(o.jwt_key))
+	tokenString, err := token.SignedString([]byte(o.Jwt_key))
 	if err != nil {
 		panic(err)
 	}
@@ -74,12 +82,12 @@ func (o *Orchestrator) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		writeError(w, invalidPass, http.StatusUnprocessableEntity)
 		return
 	}
-	_, ok := app.GetUser(req.Login, req.Password)
+	_, ok := o.GetUser(req.Login, req.Password)
 	if ok {
 		writeError(w, userAlreadyExists, http.StatusUnprocessableEntity)
 		return
 	}
-	_, err = app.AddUser(req.Login, req.Password)
+	_, err = o.AddUser(req.Login, req.Password)
 	if err != nil {
 		writeError(w, internalServerError, http.StatusInternalServerError)
 		return
@@ -105,4 +113,26 @@ func (o *Orchestrator) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	makeLoginResponse(o.MakeToken(u.ID), w)
+}
+
+func (o *Orchestrator) GetUser(login, password string) (user *User, ok bool) {
+	for _, us := range o.Users {
+		if us.Password == password && us.Login == login {
+			user = &us
+			ok = true
+			return
+		}
+	}
+	return
+}
+
+func (o *Orchestrator) AddUser(login, password string) (string, error) {
+	us := User{
+		Login:       login,
+		Password:    password,
+		Expressions: make(map[int]*Expression),
+		ID:          uuid.New().String(),
+	}
+	o.Users = append(o.Users, us)
+	return us.ID, nil
 }

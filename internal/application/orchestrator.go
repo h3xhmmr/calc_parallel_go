@@ -41,6 +41,8 @@ type Orchestrator struct {
 	mu          sync.Mutex
 	exprCounter int64
 	taskCounter int64
+	Jwt_key     string
+	Users       []User
 }
 
 func NewOrchestrator() *Orchestrator {
