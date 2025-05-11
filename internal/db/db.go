@@ -1,7 +1,7 @@
-package applicatoin
+package database
 
 import (
-	app "calc_parallel/internal/application/app"
+	app "calc_parallel/internal/app"
 	"database/sql"
 	"sync"
 
